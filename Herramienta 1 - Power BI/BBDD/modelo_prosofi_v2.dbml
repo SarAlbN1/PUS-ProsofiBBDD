@@ -1,0 +1,542 @@
+// Modelo de datos normalizado - Power BI PROSOFI V2
+// Pontificia Universidad Javeriana - Facultad de Ingeniería
+// Generado desde el diccionario de datos (fuente única). Visualizar en https://dbdiagram.io
+
+Project PROSOFI_V2 {
+  database_type: 'Generic'
+  Note: '''
+  Modelo normalizado (3FN) para la gestión analítica de proyectos sociales.
+  Reemplaza el consolidado histórico plano (una fila por participante con datos personales repetidos).
+  Clasificación: tablas con datos Restringidos nunca alimentan el modelo público de Power BI.
+  '''
+}
+
+Table cat_tipo_documento {
+  codigo varchar(5) [pk, not null, note: 'Código del tipo de documento. Regla: Mayúsculas, sin espacios.']
+  nombre varchar(60) [not null, note: 'Nombre descriptivo.']
+  Note: 'Tipos de documento de identidad admitidos.'
+}
+
+Table cat_sexo {
+  codigo varchar(2) [pk, not null, note: 'Código.']
+  nombre varchar(30) [not null, note: 'Nombre descriptivo.']
+  Note: 'Sexo registrado para análisis agregados. Uso opcional y restringido.'
+}
+
+Table cat_facultad {
+  codigo varchar(10) [pk, not null, note: 'Código de la facultad.']
+  nombre varchar(120) [not null, note: 'Nombre oficial.']
+  Note: 'Facultades de la Universidad.'
+}
+
+Table cat_programa {
+  codigo varchar(5) [pk, not null, note: 'Código del programa. Regla: 5 letras mayúsculas.']
+  nombre varchar(120) [not null, note: 'Nombre oficial del programa.']
+  cod_facultad varchar(10) [not null, note: 'Facultad a la que pertenece.']
+  Note: 'Programas académicos. El código de 5 letras coincide con el usado dentro de codigo_proyecto.'
+}
+
+Table cat_periodo_academico {
+  codigo varchar(7) [pk, not null, note: 'Código del periodo. Regla: Patrón ^[0-9]{4}-(10|20|30)$.']
+  anio smallint [not null, note: 'Año del periodo. Regla: 2019 a 2100.']
+  subperiodo varchar(2) [not null, note: 'Subperiodo académico. Regla: 10, 20 o 30.']
+  codigo_compacto varchar(4) [not null, note: 'Forma compacta del periodo. Regla: AAPP; se usa como prefijo de codigo_proyecto.']
+  fecha_inicio date [null, note: 'Inicio según calendario académico.']
+  fecha_fin date [null, note: 'Fin según calendario académico.']
+  Note: 'Periodos académicos. Formato AAAA-PP (10 = primer semestre, 20 = intersemestral, 30 = segundo semestre).'
+}
+
+Table cat_asignatura {
+  codigo varchar(10) [pk, not null, note: 'Código de la asignatura.']
+  nombre varchar(120) [not null, note: 'Nombre de la asignatura.']
+  Note: 'Asignaturas en las que se inscribe la práctica social.'
+}
+
+Table cat_rol_actor {
+  codigo varchar(15) [pk, not null, note: 'Código del rol.']
+  nombre varchar(60) [not null, note: 'Nombre del rol.']
+  Note: 'Rol que cumple una persona en una participación.'
+}
+
+Table cat_estado_participacion {
+  codigo varchar(12) [pk, not null, note: 'Código del estado.']
+  nombre varchar(60) [not null, note: 'Nombre del estado.']
+  Note: 'Estados de la participación de una persona en un periodo.'
+}
+
+Table cat_estado_proyecto {
+  codigo varchar(12) [pk, not null, note: 'Código del estado.']
+  nombre varchar(60) [not null, note: 'Nombre del estado.']
+  Note: 'Estados del ciclo de vida del proyecto.'
+}
+
+Table cat_tipo_actividad {
+  codigo varchar(15) [pk, not null, note: 'Código del tipo.']
+  nombre varchar(60) [not null, note: 'Nombre del tipo.']
+  Note: 'Naturaleza principal del proyecto; permite comparar indicadores entre proyectos similares.'
+}
+
+Table cat_ods {
+  numero smallint [pk, not null, note: 'Número del ODS. Regla: 1 a 17.']
+  nombre varchar(120) [not null, note: 'Nombre del ODS.']
+  Note: 'Objetivos de Desarrollo Sostenible (Naciones Unidas).'
+}
+
+Table cat_departamento {
+  codigo varchar(2) [pk, not null, note: 'Código DIVIPOLA del departamento. Regla: 2 dígitos DIVIPOLA.']
+  nombre varchar(80) [not null, note: 'Nombre oficial.']
+  Note: 'Departamentos de Colombia según DIVIPOLA (DANE). Cargar desde la fuente oficial.'
+}
+
+Table cat_municipio {
+  codigo varchar(5) [pk, not null, note: 'Código DIVIPOLA del municipio. Regla: 5 dígitos DIVIPOLA.']
+  nombre varchar(80) [not null, note: 'Nombre oficial.']
+  cod_departamento varchar(2) [not null, note: 'Departamento.']
+  Note: 'Municipios de Colombia según DIVIPOLA (DANE). Cargar desde la fuente oficial.'
+}
+
+Table cat_tipo_ubicacion {
+  codigo varchar(15) [pk, not null, note: 'Código.']
+  nombre varchar(60) [not null, note: 'Nombre.']
+  Note: 'Tipo de lugar asociado a un proyecto o entidad.'
+}
+
+Table cat_estado_ubicacion {
+  codigo varchar(12) [pk, not null, note: 'Código.']
+  nombre varchar(60) [not null, note: 'Nombre.']
+  Note: 'Estado de verificación de una ubicación.'
+}
+
+Table cat_tipo_entidad {
+  codigo varchar(15) [pk, not null, note: 'Código.']
+  nombre varchar(60) [not null, note: 'Nombre.']
+  Note: 'Tipo de organización aliada.'
+}
+
+Table cat_estado_solicitud {
+  codigo varchar(10) [pk, not null, note: 'Código.']
+  nombre varchar(60) [not null, note: 'Nombre.']
+  Note: 'Estado de una solicitud de corrección (Forms B).'
+}
+
+Table persona {
+  id_persona integer [pk, increment, not null, note: 'Identificador interno (sustituto del documento).']
+  cod_tipo_documento varchar(5) [not null, note: 'Tipo de documento. [Restringida]']
+  numero_documento varchar(15) [not null, unique, note: 'Número de documento. Regla: Solo dígitos (letras para PA); único junto con el tipo. [Restringida]']
+  nombres varchar(80) [not null, note: 'Nombres. [Restringida]']
+  apellidos varchar(80) [not null, note: 'Apellidos. [Restringida]']
+  correo_institucional varchar(120) [null, unique, note: 'Correo institucional. Regla: Termina en @javeriana.edu.co. [Restringida]']
+  correo_alterno varchar(120) [null, note: 'Correo externo; obligatorio solo para interlocutores sin cuenta institucional. Regla: Formato de correo. [Restringida]']
+  telefono_contacto varchar(20) [null, note: 'Teléfono de contacto; solo para interlocutores. Regla: E.164 (+57XXXXXXXXXX); solo interlocutores. [Restringida]']
+  cod_sexo varchar(2) [null, note: 'Sexo; opcional, solo para agregados. [Restringida]']
+  activo boolean [not null, default: true, note: 'Indica si el registro está vigente.']
+  fecha_registro timestamp [not null, default: `now()`, note: 'Fecha de creación del registro.']
+
+  indexes {
+    (cod_tipo_documento, numero_documento) [unique]
+  }
+  Note: 'Datos de identificación de cualquier persona del sistema. Tabla RESTRINGIDA: nunca alimenta el modelo público. Reglas: Única por (cod_tipo_documento, numero_documento).'
+}
+
+Table estudiante {
+  id_persona integer [pk, not null, note: 'Persona que es estudiante.']
+  cod_programa varchar(5) [not null, note: 'Programa académico.']
+  movilidad_internacional boolean [not null, default: false, note: 'Estudiante en convenio de movilidad.']
+  Note: 'Especialización de persona para estudiantes.'
+}
+
+Table docente {
+  id_persona integer [pk, not null, note: 'Persona que es docente.']
+  cod_facultad varchar(10) [not null, note: 'Facultad de adscripción.']
+  iniciales varchar(3) [not null, unique, note: 'Iniciales usadas en los códigos de proyecto. Regla: 3 letras; se usan en codigo_proyecto.']
+  tipo_vinculacion varchar(30) [null, note: 'Tipo de vinculación contractual.']
+  Note: 'Especialización de persona para profesores asesores o coordinadores.'
+}
+
+Table entidad {
+  id_entidad integer [pk, increment, not null, note: 'Identificador interno.']
+  nit varchar(15) [null, unique, note: 'NIT de la organización. Regla: Dígitos con dígito de verificación. [Pública]']
+  razon_social varchar(200) [not null, note: 'Razón social. [Pública]']
+  cod_tipo_entidad varchar(15) [not null, note: 'Tipo de organización. [Pública]']
+  sitio_web varchar(200) [null, note: 'Sitio web. [Pública]']
+  activa boolean [not null, default: true, note: 'Entidad vigente.']
+  Note: 'Organizaciones aliadas donde se desarrollan los proyectos.'
+}
+
+Table interlocutor {
+  id_interlocutor integer [pk, increment, not null, note: 'Identificador interno.']
+  id_persona integer [not null, note: 'Persona de contacto. [Restringida]']
+  id_entidad integer [not null, note: 'Entidad que representa.']
+  cargo varchar(80) [null, note: 'Cargo en la entidad.']
+  fecha_inicio date [not null, note: 'Inicio del rol.']
+  fecha_fin date [null, note: 'Fin del rol; vacío si está vigente. Regla: >= fecha_inicio.']
+  Note: 'Persona de contacto de una entidad. Una persona puede ser interlocutora de varias entidades en el tiempo.'
+}
+
+Table convenio {
+  id_convenio integer [pk, increment, not null, note: 'Identificador interno.']
+  id_entidad integer [not null, note: 'Entidad firmante.']
+  numero_convenio varchar(30) [not null, unique, note: 'Número oficial.']
+  fecha_inicio date [not null, note: 'Inicio de vigencia.']
+  fecha_fin date [null, note: 'Fin de vigencia. Regla: >= fecha_inicio.']
+  url_documento varchar(300) [null, note: 'Enlace al documento en SharePoint.']
+  Note: 'Convenios formales entre la Universidad y las entidades.'
+}
+
+Table proyecto {
+  id_proyecto integer [pk, increment, not null, note: 'Identificador interno.']
+  codigo_proyecto varchar(20) [not null, unique, note: 'Código institucional del proyecto. Regla: Patrón AAPP + programa(5) + iniciales(3) + \'-\' + consecutivo. [Pública]']
+  titulo varchar(200) [not null, note: 'Título del proyecto. [Pública]']
+  descripcion text [null, note: 'Descripción breve. [Pública]']
+  cod_periodo varchar(7) [not null, note: 'Periodo del proyecto.']
+  cod_programa varchar(5) [not null, note: 'Programa que lidera el proyecto.']
+  id_docente integer [not null, note: 'Profesor asesor.']
+  id_entidad integer [null, note: 'Entidad principal.']
+  cod_tipo_actividad varchar(15) [not null, note: 'Naturaleza principal. [Pública]']
+  cod_estado varchar(12) [not null, default: 'PROPUESTO', note: 'Estado del proyecto.']
+  id_proyecto_antecesor integer [null, note: 'Proyecto del periodo anterior del que es continuación.']
+  url_informe_final varchar(300) [null, note: 'Informe final del proyecto.']
+  Note: 'Proyecto social en un periodo. Un proyecto que continúa en otro periodo se registra con un nuevo código y enlaza a su antecesor. Reglas: Los 4 primeros dígitos de codigo_proyecto coinciden con cat_periodo_academico.codigo_compacto de cod_periodo.'
+}
+
+Table proyecto_entidad_socia {
+  id_proyecto integer [not null, note: 'Proyecto.']
+  id_entidad integer [not null, note: 'Entidad socia.']
+  rol_socio varchar(60) [null, note: 'Rol de la entidad en el proyecto.']
+
+  indexes {
+    (id_proyecto, id_entidad) [pk]
+  }
+  Note: 'Entidades aliadas adicionales de un proyecto (antigua tabla Proyecto_Socios).'
+}
+
+Table proyecto_ods {
+  id_proyecto integer [not null, note: 'Proyecto.']
+  numero_ods smallint [not null, note: 'ODS. [Pública]']
+  es_principal boolean [not null, default: false, note: 'Indica el ODS principal. Regla: Máximo un ODS principal por proyecto.']
+
+  indexes {
+    (id_proyecto, numero_ods) [pk]
+  }
+  Note: 'ODS a los que aporta cada proyecto. Reglas: Máximo un registro con es_principal = TRUE por proyecto.'
+}
+
+Table participacion {
+  id_participacion integer [pk, increment, not null, note: 'Identificador interno.']
+  id_persona integer [not null, note: 'Participante. [Restringida]']
+  cod_periodo varchar(7) [not null, note: 'Periodo.']
+  cod_asignatura varchar(10) [null, note: 'Asignatura.']
+  cod_rol varchar(15) [not null, default: 'ESTUDIANTE', note: 'Rol en la participación.']
+  id_proyecto integer [null, note: 'Proyecto asignado; vacío si aún no tiene.']
+  cod_estado varchar(12) [not null, default: 'INSCRITO', note: 'Estado de la participación.']
+  observaciones text [null, note: 'Notas internas.']
+
+  indexes {
+    (id_persona, cod_periodo, cod_asignatura) [unique]
+  }
+  Note: 'Participación de una persona en un periodo y asignatura. Equivale a cada fila del CSV original. Reglas: Única por (id_persona, cod_periodo, cod_asignatura).'
+}
+
+Table ubicacion {
+  id_ubicacion integer [pk, increment, not null, note: 'Identificador interno.']
+  id_proyecto integer [null, note: 'Proyecto al que pertenece.']
+  id_entidad integer [null, note: 'Entidad a la que pertenece.']
+  cod_tipo_ubicacion varchar(15) [not null, note: 'Tipo de lugar.']
+  cod_municipio varchar(5) [not null, note: 'Municipio (DIVIPOLA). Nivel máximo de detalle público. [Pública]']
+  referencia varchar(200) [null, note: 'Referencia territorial legible.']
+  latitud decimal(9,6) [null, note: 'Latitud WGS84; uso interno. Regla: Entre -90 y 90; distinta de longitud.']
+  longitud decimal(9,6) [null, note: 'Longitud WGS84; uso interno. Regla: Entre -180 y 180; en Colombia entre -82 y -66.']
+  fuente varchar(80) [null, note: 'Quién suministró la ubicación.']
+  cod_estado varchar(12) [not null, default: 'PENDIENTE', note: 'Estado de verificación.']
+  Note: 'Lugares de un proyecto o de una entidad (relación 1:N). Exactamente uno de id_proyecto o id_entidad debe estar diligenciado. Reglas: Exactamente uno de id_proyecto o id_entidad es obligatorio. latitud <> longitud (evita el valor de relleno detectado).'
+}
+
+Table indicador {
+  id_indicador integer [pk, increment, not null, note: 'Identificador interno.']
+  codigo varchar(15) [not null, unique, note: 'Código del indicador.']
+  nombre varchar(150) [not null, note: 'Nombre. [Pública]']
+  descripcion text [null, note: 'Definición operativa. [Pública]']
+  formula varchar(300) [null, note: 'Regla de cálculo.']
+  unidad varchar(30) [not null, note: 'Unidad de medida. [Pública]']
+  periodicidad varchar(20) [not null, note: 'Frecuencia de medición. Regla: Semestral, Mensual o Única.']
+  dimension varchar(30) [not null, note: 'Dimensión de análisis. Regla: Académica, Territorial, Alianzas, Resultados.']
+  numero_ods smallint [null, note: 'ODS relacionado.']
+  es_oficial boolean [not null, default: false, note: 'TRUE si pertenece a la batería institucional aprobada.']
+  Note: 'Batería de indicadores (piloto u oficial de PROSOFI).'
+}
+
+Table meta_indicador {
+  id_meta integer [pk, increment, not null, note: 'Identificador interno.']
+  id_proyecto integer [not null, note: 'Proyecto.']
+  id_indicador integer [not null, note: 'Indicador.']
+  cod_periodo varchar(7) [not null, note: 'Periodo.']
+  linea_base decimal(12,2) [null, note: 'Valor al inicio.']
+  valor_meta decimal(12,2) [not null, note: 'Valor esperado. Regla: >= 0.']
+
+  indexes {
+    (id_proyecto, id_indicador, cod_periodo) [unique]
+  }
+  Note: 'Meta de un indicador para un proyecto en un periodo.'
+}
+
+Table seguimiento_indicador {
+  id_seguimiento integer [pk, increment, not null, note: 'Identificador interno.']
+  id_meta integer [not null, note: 'Meta medida.']
+  fecha_corte date [not null, note: 'Fecha de la medición.']
+  valor_observado decimal(12,2) [not null, note: 'Valor medido. Regla: >= 0; un faltante es NULL, nunca 0.']
+  url_evidencia varchar(300) [null, note: 'Soporte en SharePoint.']
+  observaciones text [null, note: 'Notas.']
+  registrado_por integer [not null, note: 'Quién registró.']
+  Note: 'Mediciones de avance de una meta. Tabla de hechos del modelo analítico.'
+}
+
+Table solicitud_correccion {
+  id_solicitud integer [pk, increment, not null, note: 'Identificador interno.']
+  tabla_destino varchar(40) [not null, note: 'Tabla a corregir. Regla: Nombre de una tabla del modelo.']
+  id_registro integer [not null, note: 'Identificador del registro a corregir.']
+  campo varchar(40) [not null, note: 'Columna a corregir.']
+  valor_actual text [null, note: 'Valor antes del cambio.']
+  valor_propuesto text [not null, note: 'Valor solicitado.']
+  justificacion text [null, note: 'Motivo.']
+  correo_solicitante varchar(120) [not null, note: 'Quién solicita. [Restringida]']
+  cod_estado varchar(10) [not null, default: 'PENDIENTE', note: 'Estado.']
+  aprobado_por integer [null, note: 'Responsable de PROSOFI que resolvió.']
+  fecha_solicitud timestamp [not null, default: `now()`, note: 'Recepción.']
+  fecha_resolucion timestamp [null, note: 'Resolución.']
+  Note: 'Solicitudes de corrección recibidas por Forms B y su aprobación.'
+}
+
+Ref: cat_programa.cod_facultad > cat_facultad.codigo
+Ref: cat_municipio.cod_departamento > cat_departamento.codigo
+Ref: persona.cod_tipo_documento > cat_tipo_documento.codigo
+Ref: persona.cod_sexo > cat_sexo.codigo
+Ref: estudiante.id_persona - persona.id_persona
+Ref: estudiante.cod_programa > cat_programa.codigo
+Ref: docente.id_persona - persona.id_persona
+Ref: docente.cod_facultad > cat_facultad.codigo
+Ref: entidad.cod_tipo_entidad > cat_tipo_entidad.codigo
+Ref: interlocutor.id_persona > persona.id_persona
+Ref: interlocutor.id_entidad > entidad.id_entidad
+Ref: convenio.id_entidad > entidad.id_entidad
+Ref: proyecto.cod_periodo > cat_periodo_academico.codigo
+Ref: proyecto.cod_programa > cat_programa.codigo
+Ref: proyecto.id_docente > docente.id_persona
+Ref: proyecto.id_entidad > entidad.id_entidad
+Ref: proyecto.cod_tipo_actividad > cat_tipo_actividad.codigo
+Ref: proyecto.cod_estado > cat_estado_proyecto.codigo
+Ref: proyecto.id_proyecto_antecesor > proyecto.id_proyecto
+Ref: proyecto_entidad_socia.id_proyecto > proyecto.id_proyecto
+Ref: proyecto_entidad_socia.id_entidad > entidad.id_entidad
+Ref: proyecto_ods.id_proyecto > proyecto.id_proyecto
+Ref: proyecto_ods.numero_ods > cat_ods.numero
+Ref: participacion.id_persona > persona.id_persona
+Ref: participacion.cod_periodo > cat_periodo_academico.codigo
+Ref: participacion.cod_asignatura > cat_asignatura.codigo
+Ref: participacion.cod_rol > cat_rol_actor.codigo
+Ref: participacion.id_proyecto > proyecto.id_proyecto
+Ref: participacion.cod_estado > cat_estado_participacion.codigo
+Ref: ubicacion.id_proyecto > proyecto.id_proyecto
+Ref: ubicacion.id_entidad > entidad.id_entidad
+Ref: ubicacion.cod_tipo_ubicacion > cat_tipo_ubicacion.codigo
+Ref: ubicacion.cod_municipio > cat_municipio.codigo
+Ref: ubicacion.cod_estado > cat_estado_ubicacion.codigo
+Ref: indicador.numero_ods > cat_ods.numero
+Ref: meta_indicador.id_proyecto > proyecto.id_proyecto
+Ref: meta_indicador.id_indicador > indicador.id_indicador
+Ref: meta_indicador.cod_periodo > cat_periodo_academico.codigo
+Ref: seguimiento_indicador.id_meta > meta_indicador.id_meta
+Ref: seguimiento_indicador.registrado_por > persona.id_persona
+Ref: solicitud_correccion.cod_estado > cat_estado_solicitud.codigo
+Ref: solicitud_correccion.aprobado_por > persona.id_persona
+
+TableGroup Catalogos {
+  cat_tipo_documento
+  cat_sexo
+  cat_facultad
+  cat_programa
+  cat_periodo_academico
+  cat_asignatura
+  cat_rol_actor
+  cat_estado_participacion
+  cat_estado_proyecto
+  cat_tipo_actividad
+  cat_ods
+  cat_departamento
+  cat_municipio
+  cat_tipo_ubicacion
+  cat_estado_ubicacion
+  cat_tipo_entidad
+  cat_estado_solicitud
+}
+TableGroup Personas_y_actores {
+  persona
+  estudiante
+  docente
+  entidad
+  interlocutor
+  convenio
+}
+TableGroup Proyectos {
+  proyecto
+  proyecto_entidad_socia
+  proyecto_ods
+  participacion
+}
+TableGroup Territorio {
+  ubicacion
+}
+TableGroup Indicadores {
+  indicador
+  meta_indicador
+  seguimiento_indicador
+}
+TableGroup Gobierno_del_dato {
+  solicitud_correccion
+}
+
+Records cat_tipo_documento(codigo, nombre) {
+  'CC', 'Cédula de ciudadanía'
+  'TI', 'Tarjeta de identidad'
+  'CE', 'Cédula de extranjería'
+  'PA', 'Pasaporte'
+  'PPT', 'Permiso por protección temporal'
+}
+
+Records cat_sexo(codigo, nombre) {
+  'F', 'Femenino'
+  'M', 'Masculino'
+  'NR', 'Prefiere no reportar'
+}
+
+Records cat_facultad(codigo, nombre) {
+  'ING', 'Ingeniería'
+  'ARQ', 'Arquitectura y Diseño'
+  'OTR', 'Otra / convenio externo'
+}
+
+Records cat_programa(codigo, nombre, cod_facultad) {
+  'ISIST', 'Ingeniería de Sistemas', 'ING'
+  'IINDS', 'Ingeniería Industrial', 'ING'
+  'ICIVL', 'Ingeniería Civil', 'ING'
+  'IELEC', 'Ingeniería Electrónica', 'ING'
+  'BIOIN', 'Bioingeniería', 'ING'
+  'IMECA', 'Ingeniería Mecánica (confirmar)', 'ING'
+  'IMCTR', 'Ingeniería Mecatrónica', 'ING'
+  'IREDT', 'Ingeniería de Redes y Telecomunicaciones', 'ING'
+  'CDATO', 'Ciencia de Datos', 'ING'
+  'ARQUI', 'Arquitectura', 'ARQ'
+}
+
+Records cat_periodo_academico(codigo, anio, subperiodo, codigo_compacto, fecha_inicio, fecha_fin) {
+  '2019-10', 2019, '10', '1910', null, null
+  '2019-30', 2019, '30', '1930', null, null
+  '2020-10', 2020, '10', '2010', null, null
+  '2020-20', 2020, '20', '2020', null, null
+  '2020-30', 2020, '30', '2030', null, null
+  '2021-10', 2021, '10', '2110', null, null
+  '2021-20', 2021, '20', '2120', null, null
+  '2021-30', 2021, '30', '2130', null, null
+  '2022-10', 2022, '10', '2210', null, null
+  '2022-20', 2022, '20', '2220', null, null
+  '2022-30', 2022, '30', '2230', null, null
+  '2023-10', 2023, '10', '2310', null, null
+  '2023-20', 2023, '20', '2320', null, null
+  '2023-30', 2023, '30', '2330', null, null
+  '2024-10', 2024, '10', '2410', null, null
+  '2024-20', 2024, '20', '2420', null, null
+  '2024-30', 2024, '30', '2430', null, null
+  '2025-10', 2025, '10', '2510', null, null
+  '2025-20', 2025, '20', '2520', null, null
+  '2025-30', 2025, '30', '2530', null, null
+  '2026-10', 2026, '10', '2610', null, null
+}
+
+Records cat_asignatura(codigo, nombre) {
+  'PSU', 'Proyecto Social Universitario'
+  'CDIO-3', 'CDIO 3'
+}
+
+Records cat_rol_actor(codigo, nombre) {
+  'ESTUDIANTE', 'Estudiante practicante'
+  'DOCENTE', 'Profesor asesor'
+  'COORDINADOR', 'Coordinador de práctica'
+  'VOLUNTARIO', 'Voluntario'
+}
+
+Records cat_estado_participacion(codigo, nombre) {
+  'INSCRITO', 'Inscrito'
+  'ACTIVO', 'Activo'
+  'FINALIZADO', 'Finalizado'
+  'RETIRADO', 'Retirado'
+}
+
+Records cat_estado_proyecto(codigo, nombre) {
+  'PROPUESTO', 'Propuesto'
+  'ACTIVO', 'Activo'
+  'FINALIZADO', 'Finalizado'
+  'SUSPENDIDO', 'Suspendido'
+}
+
+Records cat_tipo_actividad(codigo, nombre) {
+  'DESARROLLO', 'Desarrollo de software'
+  'DISENO', 'Diseño'
+  'CAPACITACION', 'Capacitación'
+  'ASESORIA', 'Asesoría técnica'
+  'DATOS', 'Trabajo con datos'
+  'OTRO', 'Otro'
+}
+
+Records cat_ods(numero, nombre) {
+  1, 'Fin de la pobreza'
+  2, 'Hambre cero'
+  3, 'Salud y bienestar'
+  4, 'Educación de calidad'
+  5, 'Igualdad de género'
+  6, 'Agua limpia y saneamiento'
+  7, 'Energía asequible y no contaminante'
+  8, 'Trabajo decente y crecimiento económico'
+  9, 'Industria, innovación e infraestructura'
+  10, 'Reducción de las desigualdades'
+  11, 'Ciudades y comunidades sostenibles'
+  12, 'Producción y consumo responsables'
+  13, 'Acción por el clima'
+  14, 'Vida submarina'
+  15, 'Vida de ecosistemas terrestres'
+  16, 'Paz, justicia e instituciones sólidas'
+  17, 'Alianzas para lograr los objetivos'
+}
+
+Records cat_departamento(codigo, nombre) {
+  '11', 'Bogotá, D.C.'
+}
+
+Records cat_municipio(codigo, nombre, cod_departamento) {
+  '11001', 'Bogotá, D.C.', '11'
+}
+
+Records cat_tipo_ubicacion(codigo, nombre) {
+  'SEDE', 'Sede de la entidad'
+  'IMPACTO', 'Lugar de impacto'
+  'EJECUCION', 'Lugar de ejecución'
+}
+
+Records cat_estado_ubicacion(codigo, nombre) {
+  'PENDIENTE', 'Pendiente de verificación'
+  'VERIFICADA', 'Verificada'
+  'RECHAZADA', 'Rechazada'
+}
+
+Records cat_tipo_entidad(codigo, nombre) {
+  'FUNDACION', 'Fundación'
+  'ONG', 'Organización no gubernamental'
+  'PUBLICA', 'Entidad pública'
+  'EMPRESA', 'Empresa'
+  'COMUNIDAD', 'Organización comunitaria'
+  'EDUCATIVA', 'Institución educativa'
+}
+
+Records cat_estado_solicitud(codigo, nombre) {
+  'PENDIENTE', 'Pendiente'
+  'APROBADA', 'Aprobada'
+  'RECHAZADA', 'Rechazada'
+}
